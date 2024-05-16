@@ -39,20 +39,8 @@ void setup() {
   display.setTextColor(1);
   display.setTextSize(5);
   display.setCursor(20, 20);
-//  display.println("Poop");
-//  display.drawPixel(10, 10, WHITE);
   display.display();
 }
-//
-//void loop() {
-//  counter--;
-//  String counterStr = String(counter);
-////  String output = insertColons(counterStr);
-//  display.clearDisplay(); // Clear display buffer
-//  display.setCursor(20, 20); // Set cursor position
-//  display.println(counterStr); // Print counter
-//  delay(100); // Wait for 2 seconds
-//}
 
 void loop() {
     // Original integer
