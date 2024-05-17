@@ -10,26 +10,39 @@
 #define SCL 22
 
 //Peripheral Pins
-#define buttonPin 34
+#define btn1PIN 34
+#define btn2PIN 35
 
 //Variables
-int second = 0;
-int minute = 0;
-int hour = 0;
-String hourOut, minuteOut, secondOut;
+int curSec = 0;
+int curMin = 0;
+int curHour = 0;
+
+int setSec = 0;
+int setMin = 0;
+int setHour = 0;
+
+String hourOut, minOut, secOut;
+String hourBlink, minBlink, secBlink;
 
 //Usage variables
 int state = 0;
+int newState = LOW;
 int counter = 0;
 
-int currButton = 0;
-int oldButton = 0;
+int curBtn1 = 0;
+int oldBtn1 = 0;
+
+int curBtn2 = 0;
+int oldBtn2 = 0;
 
 //Timing variables
 unsigned long prevTime1 = 0;
 unsigned long prevTime2 = 0;
-const long inv1 = 1000; // Interval for task1 (1 second)
+unsigned long prevTime3 = 0;
+const long inv1 = 1; // Interval for task1 (1 second)
 const long inv2 = 10; // Interval for task2 (0.01 second)
+const long inv3 = 500; // Interval for task2 (0.5 second)
 
 //OLED Display
 Adafruit_SSD1306 display(128, 64, &Wire, -1);
@@ -49,7 +62,8 @@ void setup() {
   display.setCursor(20, 20);
 
   //Peripheral Setup
-  pinMode(buttonPin, INPUT);  
+  pinMode(btn1PIN, INPUT);
+  pinMode(btn2PIN, INPUT);  
 }
 
 void loop() {
@@ -58,75 +72,163 @@ void loop() {
 
   if(currentTime - prevTime1 >= inv1) {
     prevTime1 = currentTime;
-    iterateTime(hour, minute, second);
+    iterateTime(curHour, curMin, curSec);
   }
 
   if(currentTime - prevTime2 >= inv2) {
     prevTime2 = currentTime;
     stateSelect();
+    if(newState) {
+      curHour = setHour;
+      curMin = setMin;
+      curSec = setSec;  
+    } else {
+      setHour = curHour;
+      setMin = curMin;
+      setSec = curSec;
+    }
+    setNum();
   }
+
+  if(newState == HIGH){
+    prevTime3 = currentTime;
+  } else {
+      if(currentTime - prevTime3 >= inv3) {
+        prevTime3 = currentTime;
+        blinkNum();
+      }  
+  }
+  
   //Generate Outputs
-  String output = hourOut + ":" + minuteOut + ":" + secondOut;
+  String output = hourOut + ":" + minOut + ":" + secOut;
+  
   // Display the result 
   display.clearDisplay(); // Clear display buffer
-  display.setCursor(0, 0); // Set cursor position
+  display.setCursor(10, 30); // Set cursor position
   display.println(output); // Print output string
   display.display(); // Send buffer to display
-
-  Serial.println(output); // Print output string
+  Serial.println(digitalRead(btn2PIN)); // Print output string
 }
 
 void iterateTime(int &hour, int &minute, int &second) {
   //Iterate second or reset second and minute
-  if(second > 60) {
+  if(second > 58) {
     second = 0;
     minute++;
   } else {
     second++;
   }
   //reset minute or iterate hour
-  if(minute > 60) {
+  if(minute > 58) {
     minute = 0;
     hour++;
   }
   //reset hour
-  if(hour > 24) {
+  if(hour > 22) {
     hour = 0;
   }   
 }
 
 void stateSelect() {
-  currButton = digitalRead(buttonPin);
-  if(currButton == HIGH && oldButton == LOW){
+  curBtn1 = digitalRead(btn1PIN);
+  if(curBtn1 == HIGH && oldBtn1 == LOW){
+    newState = HIGH;
     if(state == 3) {
       state = 0;
     } else {
       state++;
     }
+  } else {
+    newState = LOW;
   }
-  oldButton = currButton;
+  oldBtn1 = curBtn1;
   switch(state) {
     case 1:
-      hourOut   = "AA";
-      minuteOut = appendZero(minute);
-      secondOut = appendZero(second);      
+      hourOut = hourBlink;
+      minOut  = appendZero(curMin);
+      secOut  = appendZero(curSec);      
       break;
     case 2:
-      hourOut   = appendZero(hour);
-      minuteOut = "AA";
-      secondOut = appendZero(second);      
+      hourOut = appendZero(curHour);
+      minOut  = minBlink;
+      secOut  = appendZero(curSec);      
       break;
     case 3:
-      hourOut   = appendZero(hour);
-      minuteOut = appendZero(minute);
-      secondOut = "AA";
+      hourOut = appendZero(curHour);
+      minOut  = appendZero(curMin);
+      secOut  = secBlink;
       break;
     default:
-      hourOut   = appendZero(hour);
-      minuteOut = appendZero(minute);
-      secondOut = appendZero(second);
+      hourOut = appendZero(curHour);
+      minOut  = appendZero(curMin);
+      secOut  = appendZero(curSec);
       break;
   }  
+}
+
+void setNum() {
+  curBtn2 = digitalRead(btn2PIN);
+  if(curBtn2 == HIGH && oldBtn2 == LOW){
+    btn2Pressed = HIGH;
+  } else {
+    btn2Pressed = LOW;
+  }
+  switch(state) {
+    case 1:
+      if(btn2Pressed) {
+        iterateNum(setHour); 
+      }
+      break;
+    case 2:
+      if(btn2Pressed) {
+        iterateNum(setMin); 
+      }   
+      break;
+    case 3:
+      if(btn2Pressed) {
+        setSec = 0; 
+      }
+      break;
+    default:
+      break;  
+}
+
+void blinkNum() {
+  setSec = curSec;
+  switch(state) {
+    case 1:
+      if(hourBlink == "  "){
+        hourBlink = appendZero(setHour);
+      } else {
+        hourBlink = "  ";
+      }
+      minBlink  = "  ";
+      secBlink  = "  ";
+      break;
+    case 2:
+      hourBlink = "  ";
+      if(minBlink == "  "){
+        minBlink = appendZero(setMin);
+      } else {
+        minBlink = "  ";
+      }
+      secBlink  = "  "; 
+      break;
+    case 3:
+      hourBlink = "  ";
+      minBlink  = "  ";    
+      if(secBlink == "  "){
+        secBlink = appendZero(setSec);
+      } else {
+        secBlink = "  ";
+      }
+      break;
+    default:
+      hourBlink = "  ";
+      minBlink  = "  ";
+      secBlink  = "  ";
+      break;
+  }    
 }
 
 String appendZero(const int &num) {

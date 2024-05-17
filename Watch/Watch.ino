@@ -61,6 +61,8 @@ void loop() {
     display.println(output); // Print output string
     display.display(); // Send buffer to display
     Serial.println(counter);
+
+    
 }
 
 //Functions
