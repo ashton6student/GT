@@ -18,16 +18,14 @@ int curSec = 0;
 int curMin = 0;
 int curHour = 0;
 
-int setSec = 0;
-int setMin = 0;
-int setHour = 0;
-
 String hourOut, minOut, secOut;
 String hourBlink, minBlink, secBlink;
 
 //Usage variables
 int state = 0;
 int newState = LOW;
+int btn2Pressed;
+int iterate = HIGH;
 int counter = 0;
 
 int curBtn1 = 0;
@@ -40,7 +38,7 @@ int oldBtn2 = 0;
 unsigned long prevTime1 = 0;
 unsigned long prevTime2 = 0;
 unsigned long prevTime3 = 0;
-const long inv1 = 1; // Interval for task1 (1 second)
+const long inv1 = 1000; // Interval for task1 (1 second)
 const long inv2 = 10; // Interval for task2 (0.01 second)
 const long inv3 = 500; // Interval for task2 (0.5 second)
 
@@ -78,15 +76,6 @@ void loop() {
   if(currentTime - prevTime2 >= inv2) {
     prevTime2 = currentTime;
     stateSelect();
-    if(newState) {
-      curHour = setHour;
-      curMin = setMin;
-      curSec = setSec;  
-    } else {
-      setHour = curHour;
-      setMin = curMin;
-      setSec = curSec;
-    }
     setNum();
   }
 
@@ -107,26 +96,7 @@ void loop() {
   display.setCursor(10, 30); // Set cursor position
   display.println(output); // Print output string
   display.display(); // Send buffer to display
-  Serial.println(digitalRead(btn2PIN)); // Print output string
-}
-
-void iterateTime(int &hour, int &minute, int &second) {
-  //Iterate second or reset second and minute
-  if(second > 58) {
-    second = 0;
-    minute++;
-  } else {
-    second++;
-  }
-  //reset minute or iterate hour
-  if(minute > 58) {
-    minute = 0;
-    hour++;
-  }
-  //reset hour
-  if(hour > 22) {
-    hour = 0;
-  }   
+  Serial.println(iterate); // Print output string
 }
 
 void stateSelect() {
@@ -168,6 +138,9 @@ void stateSelect() {
 
 void setNum() {
   curBtn2 = digitalRead(btn2PIN);
+  if(curBtn2 == LOW){
+    iterate = HIGH;
+  }
   if(curBtn2 == HIGH && oldBtn2 == LOW){
     btn2Pressed = HIGH;
   } else {
@@ -175,30 +148,33 @@ void setNum() {
   }
   switch(state) {
     case 1:
-      if(btn2Pressed) {
-        iterateNum(setHour); 
+      if(btn2Pressed && iterate) {
+        iterateHour(curHour);
+        iterate = LOW; 
       }
       break;
     case 2:
-      if(btn2Pressed) {
-        iterateNum(setMin); 
+      if(btn2Pressed && iterate) {
+        iterateMin(curMin);
+        iterate = LOW; 
       }   
       break;
     case 3:
-      if(btn2Pressed) {
-        setSec = 0; 
+      if(btn2Pressed && iterate) {
+        curSec = 0;
+        iterate = LOW; 
       }
       break;
     default:
-      break;  
+      break; 
+  } 
 }
 
 void blinkNum() {
-  setSec = curSec;
   switch(state) {
     case 1:
       if(hourBlink == "  "){
-        hourBlink = appendZero(setHour);
+        hourBlink = appendZero(curHour);
       } else {
         hourBlink = "  ";
       }
@@ -208,7 +184,7 @@ void blinkNum() {
     case 2:
       hourBlink = "  ";
       if(minBlink == "  "){
-        minBlink = appendZero(setMin);
+        minBlink = appendZero(curMin);
       } else {
         minBlink = "  ";
       }
@@ -218,7 +194,7 @@ void blinkNum() {
       hourBlink = "  ";
       minBlink  = "  ";    
       if(secBlink == "  "){
-        secBlink = appendZero(setSec);
+        secBlink = appendZero(curSec);
       } else {
         secBlink = "  ";
       }
@@ -240,4 +216,48 @@ String appendZero(const int &num) {
   }
 
   return result;
+}
+
+void iterateHour(int &hour) {
+  //reset hour
+  if(hour > 22) {
+    hour = 0;
+  } else {
+    hour++;  
+  }
+}
+
+void iterateMin(int &minute) {
+  //reset minute or iterate hour
+  if(minute > 58) {
+    minute = 0;
+  } else {
+    minute++;  
+  }
+}
+
+void iterateSec(int &second) {
+  if(second > 58) {
+    second = 0;
+  } else {
+    second++;
+  }  
+}
+void iterateTime(int &hour, int &minute, int &second) {
+  //Iterate second or reset second and minute
+  if(second > 58) {
+    second = 0;
+    minute++;
+  } else {
+    second++;
+  }
+  //reset minute or iterate hour
+  if(minute > 58) {
+    minute = 0;
+    hour++;
+  }
+  //reset hour
+  if(hour > 22) {
+    hour = 0;
+  }   
 }
