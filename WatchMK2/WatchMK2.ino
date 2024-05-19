@@ -17,7 +17,7 @@
 //Variables
 /////////////////////
 //General variables
-  //Peripherals
+  //Peripherals - btn1 = right , btn2 = top left, btn3 = bottom left
   int curBtn1 = 0;
   int oldBtn1 = 0;
   int btn1Pressed;
@@ -37,17 +37,19 @@
   
   const long inv1 = 1000; // Interval for task1 (1 second)
   const long inv2 = 10; // Interval for task2 (0.01 second)
-  const long inv3 = 500; // Interval for task2 (0.5 second)
+  const long inv3 = 500; // Interval for task3 (0.5 second)
+  const long inv4 = 100; // Interval for task4 (0.1 second)
   
   //Control
   int state = 0; //0 - Clock, 1 - Alarm, 2 - Stopwatch, 3 - Set Clock
+  String tag;
   
 //State 0 - Clock variables
   int curSec = 0;
   int curMin = 0;
   int curHour = 0;
 
-  String hourOut, minOut, secOut, tag;
+  String hourOut, minOut, secOut;
   
 //State 1 - Alarm variables
   int alrMin = 0;
@@ -57,6 +59,10 @@
   int stpMil = 0;
   int stpSec = 0;
   int stpMin = 0;
+  
+  int hldMil = 0;
+  int hldSec = 0;
+  int hldMin = 0;
 
 //State 3 - Set Clock variables
   int setState; //0 - Don't set, 1 - set hour, 2 - set minute, 3 - reset second
@@ -397,6 +403,14 @@ void iterateSec(int &second) {
     second++;
   }  
 }
+
+void iterateMil(int &milli) {
+  if(milli > 98) {
+    milli = 0;
+  } else {
+    milli++;
+  }  
+}
 void iterateTime(int &hour, int &minute, int &second) {
   //Iterate second or reset second and minute
   if(second > 58) {
@@ -413,6 +427,25 @@ void iterateTime(int &hour, int &minute, int &second) {
   //reset hour
   if(hour > 22) {
     hour = 0;
+  }   
+}
+
+void iterateTime2(int &minute, int &second, int &milli) {
+  //Iterate second or reset second and minute
+  if(milli > 98) {
+    milli = 0;
+    second++;
+  } else {
+    milli++;
+  }
+  //reset minute or iterate hour
+  if(second > 58) {
+    second = 0;
+    minute++;
+  }
+  //reset hour
+  if(minute > 58) {
+    minute = 0;
   }   
 }
 ///////////////////////////////
