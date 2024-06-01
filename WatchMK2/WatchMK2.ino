@@ -14,6 +14,7 @@
 #define btn2PIN 32
 #define btn3PIN 35
 
+#define buzzerPIN 23
 //Variables
 /////////////////////
 //General variables
@@ -42,18 +43,24 @@
   
   //Control
   int state = 0; //0 - Clock, 1 - Alarm, 2 - Stopwatch, 3 - Set Clock
-  String tag;
+  String tag, output;
+  String hourOut, minOut, secOut;
   
 //State 0 - Clock variables
   int curSec = 0;
   int curMin = 0;
   int curHour = 0;
-
-  String hourOut, minOut, secOut;
   
 //State 1 - Alarm variables
-  int alrMin = 0;
+  int alrState = 0; //0 - hold state, 1 - set hour, 2 - set minute, 3 - reset second (Unused here)
+  
+  int alrMin = 1;
   int alrHour = 0;
+  int alrSec = 0;
+
+  bool alrSounded = false;
+
+  String alrHourOut,alrMinOut, alrSecOut;
   
 //State 2 - Stopwatch variables
   int stpMil = 0;
@@ -65,9 +72,10 @@
   int hldMin = 0;
 
 //State 3 - Set Clock variables
-  int setState; //0 - Don't set, 1 - set hour, 2 - set minute, 3 - reset second
+  int setState = 1; //0 - hold state (Unused here), 1 - set hour, 2 - set minute, 3 - reset second
   int iterate = HIGH;
-  String hourBlink, minBlink, secBlink;
+  
+  String setHourOut, setMinOut, setSecOut;
 /////////////////////
 
 //OLED Display
@@ -88,7 +96,8 @@ void setup() {
   //Peripheral Setup
   pinMode(btn1PIN, INPUT);
   pinMode(btn2PIN, INPUT);
-  pinMode(btn3PIN, INPUT);  
+  pinMode(btn3PIN, INPUT);
+  pinMode(buzzerPIN, OUTPUT);    
 }
 
 void loop() {
@@ -97,11 +106,13 @@ void loop() {
 
   //Occurs every second. 
   if(currentTime - prevTime1 >= inv1) {
-    //Save current time
+    //Save Current Time
     prevTime1 = currentTime;
+    
     //Occurs For All States
     iterateTime(curHour, curMin, curSec);
-    //State Select
+    
+    //State Dependent Functions
     switch(state) {
       case 0: //Clock state
         break;
@@ -118,51 +129,71 @@ void loop() {
 
   //Occurs every 0.01 seconds - USED FOR: Setting setState, setting display numbers.
   if(currentTime - prevTime2 >= inv2) {
+    //Save Current Time
     prevTime2 = currentTime;
     
-    //State Select
+    //Occurs For All States
     checkPeripherals();
     stateSelect();
+    alrAlarm();
+
+    //State Dependent Functions
     switch(state) {
       case 0: //Clock state
         break;
       case 1: //Alarm state
+        alrStateSelect();
+        setNum(alrState, alrHour, alrMin, alrSec);
         break;
       case 2: //Stopwatch state
         break;
       case 3: //Set Clock state
         setStateSelect();
-        setNum();
+        setNum(setState, curHour, curMin, curSec);
         break;
       default:
         break;
     }
   }
 
-  //Occurs every quarter second - USED FOR: Blinking in Set Clock state.
-  if(btn1Pressed == HIGH){
+  //Occurs every quarter second - USED FOR: Blinking.
+  if(btn2Pressed == HIGH){
+    //Save Current Time
     prevTime3 = currentTime;
   } else {
       if(currentTime - prevTime3 >= inv3) {
+        //Save Current Time
         prevTime3 = currentTime;
-      //State Select
-      switch(state) {
-        case 0: //Clock state
-          break;
-        case 1: //Alarm state
-          break;
-        case 2: //Stopwatch state
-          break;
-        case 3: //Set Clock state
-          blinkNum();
-          break;
-        default:
-          break;
-      }
-    }  
+
+        //Occurs For All States
+        
+        //State Dependent Functions
+        switch(state) {
+          case 0: //Clock state
+            break;
+          case 1: //Alarm state
+            blinkNum(alrState, alrHour, alrMin, alrSec, alrHourOut, alrMinOut, alrSecOut);
+            break;
+          case 2: //Stopwatch state
+            break;
+          case 3: //Set Clock state
+            blinkNum(setState, curHour, curMin, curSec, setHourOut, setMinOut, setSecOut);
+            break;
+          default:
+            break;
+        }
+      }  
   }
+  
   // Display the result 
   displayWatch();
+
+  //Button press noise making
+  if(curBtn1 || curBtn2 || curBtn3) {
+    digitalWrite(buzzerPIN, HIGH);
+  } else {
+    digitalWrite(buzzerPIN, LOW);
+  }
 }
 
 //General Functions
@@ -177,9 +208,9 @@ void displayWatch() {
       break;
     case 1: //Alarm state
       tag = "Alarm";
-      hourOut = "11";
-      minOut  = "11";
-      secOut  = "11";
+      hourOut = alrHourOut;
+      minOut  = alrMinOut;
+      secOut  = alrSecOut;
       break;
     case 2: //Stopwatch state
       tag = "Stopwatch";
@@ -188,34 +219,16 @@ void displayWatch() {
       secOut  = "22";
       break;
     case 3: //Set Clock state
-      tag = "Set Clock";
-        switch(setState) {
-          case 0:
-            hourOut = hourBlink;
-            minOut  = appendZero(curMin);
-            secOut  = appendZero(curSec);      
-            break;
-          case 1:
-            hourOut = appendZero(curHour);
-            minOut  = minBlink;
-            secOut  = appendZero(curSec);      
-            break;
-          case 2:
-            hourOut = appendZero(curHour);
-            minOut  = appendZero(curMin);
-            secOut  = secBlink;
-            break;
-          default:
-            hourOut = appendZero(curHour);
-            minOut  = appendZero(curMin);
-            secOut  = appendZero(curSec);
-            break;
-        }  
+      tag = "Set Clock";  
+      hourOut = setHourOut;
+      minOut  = setMinOut;
+      secOut  = setSecOut;
       break;
     default:
       break;
   }
-  String output = hourOut + ":" + minOut + ":" + secOut;
+
+  //Clear Display
   display.clearDisplay(); // Clear display buffer
 
   //Draw Tag
@@ -266,10 +279,7 @@ void checkPeripherals() {
   oldBtn2 = curBtn2; 
   oldBtn3 = curBtn3;  
 }
-///////////////////////////////
 
-//State - 0 Clock Functions
-///////////////////////////////
 void stateSelect() {
   if(btn3Pressed){
     if(state == 3)
@@ -278,47 +288,28 @@ void stateSelect() {
       state++;
   }
 }
-///////////////////////////////
 
-//State - 1 Alarm Functions
-///////////////////////////////
-///////////////////////////////
-
-//State - 2 Stopwatch Functions
-///////////////////////////////
-///////////////////////////////
-
-//State - 3 Set Clock Functions
-///////////////////////////////
-void setStateSelect() {
-  if(btn1Pressed){
-    if(setState == 2)
-      setState = 0;
-    else
-      setState++;
-  }
-}
-
-void setNum() {
-  if(curBtn2 == LOW){
+//This function takes in a state variables and iterates the number depending on the state. The state will clarify what kind of number it is (hour, min, sec)
+void setNum(const int &state, int &hour, int &minute, int &second) {
+    if(curBtn1 == LOW){
     iterate = HIGH;
   }
-  switch(setState) {
-    case 0:
-      if(btn2Pressed && iterate) {
-        iterateHour(curHour);
+  switch(state) {
+    case 1: //in hour set
+      if(btn1Pressed && iterate) {
+        iterateHour(hour);
         iterate = LOW; 
       }
       break;
-    case 1:
-      if(btn2Pressed && iterate) {
-        iterateMin(curMin);
+    case 2: //in minute set
+      if(btn1Pressed && iterate) {
+        iterateMin(minute);
         iterate = LOW; 
       }   
       break;
-    case 2:
-      if(btn2Pressed && iterate) {
-        curSec = 0;
+    case 3: //in second set
+      if(btn1Pressed && iterate) {
+        second = 0;
         iterate = LOW; 
       }
       break;
@@ -327,45 +318,45 @@ void setNum() {
   } 
 }
 
-void blinkNum() {
-  switch(setState) {
-    case 0:
-      if(hourBlink == "  "){
-        hourBlink = appendZero(curHour);
-      } else {
-        hourBlink = "  ";
-      }
-      minBlink  = "  ";
-      secBlink  = "  ";
-      break;
+void blinkNum(const int &state, const int &hour, const int &minute, const int &second, String &hourStr, String &minStr, String &secStr) {
+  switch(state) {
     case 1:
-      hourBlink = "  ";
-      if(minBlink == "  "){
-        minBlink = appendZero(curMin);
+      if(hourStr == "  "){
+        hourStr = appendZero(hour);
       } else {
-        minBlink = "  ";
+        hourStr = "  ";
       }
-      secBlink  = "  "; 
+      minStr  = appendZero(minute);
+      secStr  = appendZero(second);
       break;
     case 2:
-      hourBlink = "  ";
-      minBlink  = "  ";    
-      if(secBlink == "  "){
-        secBlink = appendZero(curSec);
+      hourStr = appendZero(hour);
+      if(minStr == "  "){
+        minStr = appendZero(minute);
       } else {
-        secBlink = "  ";
+        minStr = "  ";
+      }
+      secStr  = appendZero(second); 
+      break;
+    case 3:
+      hourStr = appendZero(hour);
+      minStr  = appendZero(minute);    
+      if(secStr == "  "){
+        secStr = appendZero(second);
+      } else {
+        secStr = "  ";
       }
       break;
     default:
-      hourBlink = "  ";
-      minBlink  = "  ";
-      secBlink  = "  ";
+      hourStr = appendZero(hour);
+      minStr  = appendZero(minute);
+      secStr  = appendZero(second);
       break;
   }    
 }
 ///////////////////////////////
 
-//General Utility Functions
+//Utility Functions
 ///////////////////////////////
 String appendZero(const int &num) {
   String result = "";
@@ -447,5 +438,62 @@ void iterateTime2(int &minute, int &second, int &milli) {
   if(minute > 58) {
     minute = 0;
   }   
+}
+///////////////////////////////
+
+//State - 0 Clock Functions
+///////////////////////////////
+///////////////////////////////
+
+//State - 1 Alarm Functions
+///////////////////////////////
+void alrStateSelect() {
+  if(btn2Pressed){
+    if(alrState == 2)
+      alrState = 0;
+    else
+      alrState++;
+  }
+}
+
+void alrAlarm() {
+  // Check if the current time is past the alarm time
+  if (curHour > alrHour || (curHour == alrHour && curMin >= alrMin)) {
+    // If the alarm has not sounded yet
+    if (!alrSounded) {
+      digitalWrite(buzzerPIN, HIGH);
+      state = 1;
+      // Check if the button is pressed to stop the alarm
+      if (curBtn1) {
+        alrSounded = true;
+        state = 0;
+      }
+    } else {
+      // If the alarm has already sounded, turn off the buzzer
+      digitalWrite(buzzerPIN, LOW);
+    }
+  } else {
+    // If the current time is before the alarm time, ensure the buzzer is off
+    digitalWrite(buzzerPIN, LOW);
+  }
+}
+///////////////////////////////
+
+//State - 2 Stopwatch Functions
+///////////////////////////////
+void stopStateSelect() {
+  
+}
+///////////////////////////////
+
+//State - 3 Set Clock Functions
+///////////////////////////////
+void setStateSelect() {
+  if(btn2Pressed){
+    if(setState == 3)
+      setState = 1;
+    else
+      setState++;
+  }
 }
 ///////////////////////////////
